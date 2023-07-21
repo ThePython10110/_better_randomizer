@@ -1,0 +1,3 @@
+better_randomizer_randomize_crafts (Randomize Crafts) bool true
+better_randomizer_randomize_node_drops (Randomize Node Drops) bool true
+better_randomizer_randomize_entity_drops (Randomize Entity Drops) bool true
