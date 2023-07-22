@@ -14,11 +14,17 @@ better_randomizer_randomize_entity_drops (Randomize Entity Drops) bool true
 
 ### Chat commands:
 *All commands require the `server` privilege.*
+
 `/randomize_crafts`: Randomizes crafting recipes, without requiring a restart.
+
 `/randomize_node_drops`: Randomizes node drops after the next restart.
+
 `/randomize_entity_drops`: Randomizes node drops after the next restart.
+
 `/toggle_craft_randomization`: Toggles crafting randomization without requiring a restart. Recipes are *not re-randomized* when toggling randomness.
+
 `/toggle_node_drop_randomization`: Toggles node drop randomization after the next restart. Drops are *not re-randomized* when toggling randomness.
+
 `/toggle_entity_drop_randomization`: Toggles entity drop randomization after the next restart. Drops are *not re-randomized* when toggling randomness.
 
 ### KNOWN ISSUES:
