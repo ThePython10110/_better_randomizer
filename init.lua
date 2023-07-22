@@ -4,28 +4,26 @@ local randomize_node_drops = false
 local randomize_entity_drops = false
 local randomize_crafts = false
 if (storage:get_int("randomize_node_drops") == 1) or
-(minetest.settings:get_bool("better_randomizer_randomize_node_drops", true) and not storage:get_int("not_first_load")) then
+(minetest.settings:get_bool("better_randomizer_randomize_node_drops", true) and not (storage:get_int("not_first_load") == 1)) then
     randomize_node_drops = true
 end
 if (storage:get_int("randomize_entity_drops") == 1) or
-(minetest.settings:get_bool("better_randomizer_randomize_entity_drops", true) and not storage:get_int("not_first_load")) then
+(minetest.settings:get_bool("better_randomizer_randomize_entity_drops", true) and not (storage:get_int("not_first_load") == 1)) then
     randomize_entity_drops = true
 end
-if minetest.settings:get_bool("better_randomizer_randomize_crafts", true) and not storage:get_int("not_first_load") then
+if minetest.settings:get_bool("better_randomizer_randomize_crafts", true) and not (storage:get_int("not_first_load") == 1) then
     randomize_crafts = true
 end
 
 storage:set_int("not_first_load", 1)
-
-minetest.log(dump({nodes=randomize_node_drops,entities=randomize_entity_drops,crafts=randomize_crafts}))
 
 better_randomizer = {}
 
 function better_randomizer.load_node_drops()
     if not better_randomizer.random_node_drops then return end
     for i, info in ipairs(better_randomizer.random_node_drops) do
-        minetest.log(dump(info))
         if info.name and info.overrides then
+            if info.overrides.drop and type(info.overrides.drop) == "string" and info.overrides.drop:find("clay") then minetest.log(dump(info)) end
             minetest.override_item(info.name, info.overrides)
         end
     end
@@ -42,11 +40,13 @@ end
 
 function better_randomizer.randomize_node_drops()
     storage:set_int("randomize_node_drops", 0)
+    storage:set_int("node_drops_randomized", 1)
     local items = {}
     better_randomizer.random_node_drops = {}
     for name, def in pairs(minetest.registered_nodes) do
         if (not def.groups.not_in_creative_inventory) and
-        ((def.drop ~= "" and def.drop ~= {}) or def._mcl_silk_touch_drop or def._mcl_shears_drop) then
+        ((def.drop ~= "" and def.drop ~= {}) or def._mcl_silk_touch_drop or def._mcl_shears_drop)
+        and not (minetest.get_item_group(name, "coral") == 1) then
             table.insert(items, name)
             if not mineclone then
                 table.insert(better_randomizer.random_node_drops, {name=name, overrides = {drop = def.drop}})
@@ -76,6 +76,7 @@ end
 
 function better_randomizer.randomize_entity_drops()
     storage:set_int("randomize_entity_drops", 0)
+    storage:set_int("entity_drops_randomized", 1)
     better_randomizer.random_entity_drops = {}
     local entities = {}
     for name, def in pairs(minetest.registered_entities) do
@@ -111,15 +112,20 @@ minetest.register_chatcommand("randomize_node_drops", {
     description = "Sets Better Randomizer to randomize node drops next time it loads. Requires server privilege.",
     func = function()
         storage:set_int("randomize_node_drops", 1)
+        storage:set_int("node_drops_randomized", 1)
     end
 })
 
-minetest.register_chatcommand("unrandomize_node_drops", {
+minetest.register_chatcommand("toggle_node_drop_randomization", {
     privs = {server = true},
-    description = "Sets Better Randomizer to unrandomize node drops next time it loads. Requires server privilege.",
+    description = "Sets Better Randomizer to toggle node drop randomization next time it loads. Requires server privilege.",
     func = function()
         storage:set_int("randomize_node_drops", 0)
-        storage:set_string("node_drops", nil)
+        if storage:get_int("node_drops_randomized") == 0 then
+            storage:set_int("node_drops_randomized", 1)
+        else
+            storage:set_int("node_drops_randomized", 0)
+        end
     end
 })
 
@@ -128,15 +134,20 @@ minetest.register_chatcommand("randomize_entity_drops", {
     description = "Sets Better Randomizer to randomize entity drops next time it loads. Requires server privilege.",
     func = function()
         storage:set_int("randomize_entity_drops", 1)
+        storage:set_int("entity_drops_randomized", 1)
     end
 })
 
-minetest.register_chatcommand("unrandomize_entity_drops", {
+minetest.register_chatcommand("toggle_entity_drop_randomization", {
     privs = {server = true},
-    description = "Sets Better Randomizer to unrandomize entity drops next time it loads. Requires server privilege.",
+    description = "Sets Better Randomizer to toggle entity drop randomization next time it loads. Requires server privilege.",
     func = function()
         storage:set_int("randomize_entity_drops", 0)
-        storage:set_string("entity_drops", nil)
+        if storage:get_int("entity_drops_randomized") == 0 then
+            storage:set_int("entity_drops_randomized", 1)
+        else
+            storage:set_int("entity_drops_randomized", 0)
+        end
     end
 })
 
@@ -146,62 +157,70 @@ minetest.register_chatcommand("randomize_crafts", {
     func = better_randomizer.randomize_crafts
 })
 
-minetest.register_chatcommand("unrandomize_crafts", {
+minetest.register_chatcommand("toggle_craft_randomization", {
     privs = {server = true},
-    description = "Unrandomize crafting recipes. Does not require a restart. Requires server privilege.",
+    description = "Turns crafting randomization on or off. Does not require a restart. Requires server privilege.",
     func = function()
-        storage:set_int("crafts_randomized", 0)
+        if storage:get_int("crafts_randomized") == 0 then
+            storage:set_int("crafts_randomized", 1)
+        else
+            storage:set_int("crafts_randomized", 0)
+        end
     end
 })
 
-better_randomizer.all_crafts = {normal = {}, cooking = {}}
-better_randomizer.random_crafts = {normal = {}, cooking = {}}
-for name, def in pairs(minetest.registered_items) do
-    local item_crafts = minetest.get_all_craft_recipes(name)
-    if item_crafts then
+minetest.register_on_mods_loaded(function()
+    better_randomizer.all_crafts = {normal = {}, cooking = {}}
+    better_randomizer.random_crafts = {normal = {}, cooking = {}}
+    for name, def in pairs(minetest.registered_items) do
+        local item_crafts = minetest.get_all_craft_recipes(name) or {}
         for _, craft in ipairs(item_crafts) do
-            if craft.output ~= "" and (craft.method == "normal" or craft.method == "cooking") then
+            if craft.method == "normal" or craft.method == "cooking" then
                 better_randomizer.all_crafts[craft.method][#better_randomizer.all_crafts[craft.method]+1] = craft.output
                 better_randomizer.random_crafts[craft.method][craft.output] = craft.output
             end
         end
     end
-end
-
-for _, craft in pairs({ "craft_predict", "on_craft" }) do
-    minetest["register_" .. craft](function(itemstack, player, old_craft_grid, craft_inv)
-        if storage:get_int("crafts_randomized") ~= 1 then return end
-        if itemstack ~= nil and itemstack ~= ItemStack("") then
-            if craft_inv:get_location().type == "player" then
-                local itemstring = better_randomizer.random_crafts.normal[itemstack:get_name()]
-                if itemstring then return ItemStack(itemstring) else return itemstack end
-            elseif craft_inv:get_location().type == "node" and not craft_inv:get_lists().craft then
-                minetest.log(dump(craft_inv:get_lists()))
-                local itemstring = better_randomizer.random_crafts.normal[itemstack:get_name()]
-                if itemstring then return ItemStack(itemstring) else return itemstack end
-            else
-                minetest.log(dump(craft_inv:get_location()))
+    
+    for _, craft in pairs({ "craft_predict", "on_craft" }) do
+        minetest["register_" .. craft](function(itemstack, player, old_craft_grid, craft_inv)
+            if storage:get_int("crafts_randomized") ~= 1 then return end
+            if itemstack ~= nil and itemstack ~= ItemStack("") then
+                local itemstring = better_randomizer.random_crafts.normal[itemstack:to_string()]
+                if itemstring then return ItemStack(itemstring) else minetest.log(dump(itemstack:to_string())) end
             end
-        end
-    end)
-end
+        end)
+    end
 
-if randomize_crafts then
-    better_randomizer.randomize_crafts()
-else
-    better_randomizer.random_crafts = minetest.deserialize(storage:get_string("crafts")) or better_randomizer.random_crafts
+    if randomize_crafts then
+        better_randomizer.randomize_crafts()
+    else
+        better_randomizer.random_crafts = minetest.deserialize(storage:get_string("crafts")) or better_randomizer.random_crafts
+    end
+end)
+
+local old_craft_result = minetest.get_craft_result
+
+-- This makes furnaces work.
+minetest.get_craft_result = function(input)
+    local output, decremented_input = old_craft_result(input)
+    if input.method == "normal" or input.method == "cooking" then
+        local itemstring = better_randomizer.random_crafts[input.method][output.item:to_string()]
+        if itemstring then output.item = ItemStack(itemstring) end
+    end
+    return output, decremented_input
 end
 
 if randomize_node_drops then
     better_randomizer.randomize_node_drops()
-else
+elseif storage:get_int("node_drops_randomized") == 1 then
     better_randomizer.random_node_drops = minetest.deserialize(storage:get_string("node_drops"))
     better_randomizer.load_node_drops()
 end
 
 if randomize_entity_drops then
     better_randomizer.randomize_entity_drops()
-else
+elseif storage:get_int("entity_drops_randomized") == 1 then
     better_randomizer.random_entity_drops = minetest.deserialize(storage:get_string("entity_drops"))
     better_randomizer.load_entity_drops()
 end
