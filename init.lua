@@ -23,7 +23,6 @@ function better_randomizer.load_node_drops()
     if not better_randomizer.random_node_drops then return end
     for i, info in ipairs(better_randomizer.random_node_drops) do
         if info.name and info.overrides then
-            if info.overrides.drop and type(info.overrides.drop) == "string" and info.overrides.drop:find("clay") then minetest.log(dump(info)) end
             minetest.override_item(info.name, info.overrides)
         end
     end
@@ -109,7 +108,7 @@ end
 
 minetest.register_chatcommand("randomize_node_drops", {
     privs = {server = true},
-    description = "Sets Better Randomizer to randomize node drops next time it loads. Requires server privilege.",
+    description = "Randomizes node drops after the next restart. Requires server privilege.",
     func = function()
         storage:set_int("randomize_node_drops", 1)
         storage:set_int("node_drops_randomized", 1)
@@ -118,7 +117,7 @@ minetest.register_chatcommand("randomize_node_drops", {
 
 minetest.register_chatcommand("toggle_node_drop_randomization", {
     privs = {server = true},
-    description = "Sets Better Randomizer to toggle node drop randomization next time it loads. Requires server privilege.",
+    description = "Toggles node drop randomization after the next restart. Drops are *not re-randomized* when toggling randomness. Requires server privilege.",
     func = function()
         storage:set_int("randomize_node_drops", 0)
         if storage:get_int("node_drops_randomized") == 0 then
@@ -131,7 +130,7 @@ minetest.register_chatcommand("toggle_node_drop_randomization", {
 
 minetest.register_chatcommand("randomize_entity_drops", {
     privs = {server = true},
-    description = "Sets Better Randomizer to randomize entity drops next time it loads. Requires server privilege.",
+    description = "Randomizes node drops after the next restart. Requires server privilege.",
     func = function()
         storage:set_int("randomize_entity_drops", 1)
         storage:set_int("entity_drops_randomized", 1)
@@ -140,7 +139,7 @@ minetest.register_chatcommand("randomize_entity_drops", {
 
 minetest.register_chatcommand("toggle_entity_drop_randomization", {
     privs = {server = true},
-    description = "Sets Better Randomizer to toggle entity drop randomization next time it loads. Requires server privilege.",
+    description = "Toggles entity drop randomization after the next restart. Drops are *not re-randomized* when toggling randomness. Requires server privilege.",
     func = function()
         storage:set_int("randomize_entity_drops", 0)
         if storage:get_int("entity_drops_randomized") == 0 then
@@ -153,13 +152,13 @@ minetest.register_chatcommand("toggle_entity_drop_randomization", {
 
 minetest.register_chatcommand("randomize_crafts", {
     privs = {server = true},
-    description = "Randomize crafting recipes. Does not require a restart. Requires server privilege.",
+    description = "Randomizes crafting recipes, without requiring a restart. Requires server privilege.",
     func = better_randomizer.randomize_crafts
 })
 
 minetest.register_chatcommand("toggle_craft_randomization", {
     privs = {server = true},
-    description = "Turns crafting randomization on or off. Does not require a restart. Requires server privilege.",
+    description = "Toggles crafting randomization without requiring a restart. Recipes are *not re-randomized* when toggling randomness. Requires server privilege.",
     func = function()
         if storage:get_int("crafts_randomized") == 0 then
             storage:set_int("crafts_randomized", 1)
@@ -187,7 +186,7 @@ minetest.register_on_mods_loaded(function()
             if storage:get_int("crafts_randomized") ~= 1 then return end
             if itemstack ~= nil and itemstack ~= ItemStack("") then
                 local itemstring = better_randomizer.random_crafts.normal[itemstack:to_string()]
-                if itemstring then return ItemStack(itemstring) else minetest.log(dump(itemstack:to_string())) end
+                if itemstring then return ItemStack(itemstring) end
             end
         end)
     end
