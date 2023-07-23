@@ -3,6 +3,16 @@ local mineclone = minetest.get_modpath("mcl_core")
 local randomize_node_drops = false
 local randomize_entity_drops = false
 local randomize_crafts = false
+
+--[[local entity_blacklist = {
+    "mobs_mc:slime_big",
+    "mobs_mc:slime_small",
+    "mobs_mc:slime_tiny",
+    "mobs_mc:magma_cube_big",
+    "mobs_mc:magma_cube_small",
+    "mobs_mc:magma_cube_tiny",
+}  --]]
+
 if (storage:get_int("randomize_node_drops") == 1) or
 (minetest.settings:get_bool("better_randomizer_randomize_node_drops", true) and not (storage:get_int("not_first_load") == 1)) then
     randomize_node_drops = true
@@ -31,7 +41,7 @@ end
 function better_randomizer.load_entity_drops()
     if not better_randomizer.random_entity_drops then return end
     for i, info in ipairs(better_randomizer.random_entity_drops) do
-        if info.name and info.drops then
+        if info.name and info.drops and minetest.registered_entities[info.name] then
             minetest.registered_entities[info.name].drops = info.drops
         end
     end
@@ -45,7 +55,7 @@ function better_randomizer.randomize_node_drops()
     for name, def in pairs(minetest.registered_nodes) do
         if (not def.groups.not_in_creative_inventory) and
         ((def.drop ~= "" and def.drop ~= {}) or def._mcl_silk_touch_drop or def._mcl_shears_drop)
-        and not (minetest.get_item_group(name, "coral") == 1) then
+        and not (mineclone and (minetest.get_item_group(name, "coral") == 1)) then
             table.insert(items, name)
             if not mineclone then
                 table.insert(better_randomizer.random_node_drops, {name=name, overrides = {drop = def.drop}})
@@ -79,17 +89,33 @@ function better_randomizer.randomize_entity_drops()
     better_randomizer.random_entity_drops = {}
     local entities = {}
     for name, def in pairs(minetest.registered_entities) do
-        if def.drops and def.drops ~= {} then
-            table.insert(entities, {name = name})
+        if def.drops and (#def.drops > 0) then
+            table.insert(entities, name)
             table.insert(better_randomizer.random_entity_drops, {name=name, drops=def.drops})
         end
     end
     table.shuffle(better_randomizer.random_entity_drops)
-    for i, info in ipairs(entities) do
-        better_randomizer.random_entity_drops[i].name = info.name
+    for i, name in ipairs(entities) do
+        better_randomizer.random_entity_drops[i].name = name
     end
     storage:set_string("entity_drops", minetest.serialize(better_randomizer.random_entity_drops))
     better_randomizer.load_entity_drops()
+end
+
+local original_entity_drops = {}
+
+for name, def in pairs(minetest.registered_entities) do
+    if def.drops then
+        original_entity_drops[name] = def.drops
+    end
+end
+
+function better_randomizer.unrandomize_entity_drops()
+    storage:set_int("entity_drops_randomized", 0)
+    storage:set_int("randomize_entity_drops", 0)
+    for name, drops in pairs(original_entity_drops) do
+        minetest.registered_entities[name].drops = drops
+    end
 end
 
 function better_randomizer.randomize_crafts()
@@ -130,22 +156,21 @@ minetest.register_chatcommand("toggle_node_drop_randomization", {
 
 minetest.register_chatcommand("randomize_entity_drops", {
     privs = {server = true},
-    description = "Randomizes node drops after the next restart. Requires server privilege.",
-    func = function()
-        storage:set_int("randomize_entity_drops", 1)
-        storage:set_int("entity_drops_randomized", 1)
-    end
+    description = "Randomizes entity drops without requiring a restart. Requires server privilege.",
+    func = better_randomizer.randomize_entity_drops
 })
 
 minetest.register_chatcommand("toggle_entity_drop_randomization", {
     privs = {server = true},
-    description = "Toggles entity drop randomization after the next restart. Drops are *not re-randomized* when toggling randomness. Requires server privilege.",
+    description = "Toggles entity drop randomization without requiring a restart. Drops are *not re-randomized* when toggling randomness. Requires server privilege.",
     func = function()
         storage:set_int("randomize_entity_drops", 0)
         if storage:get_int("entity_drops_randomized") == 0 then
+            better_randomizer.load_entity_drops()
             storage:set_int("entity_drops_randomized", 1)
         else
             storage:set_int("entity_drops_randomized", 0)
+            better_randomizer.unrandomize_entity_drops()
         end
     end
 })
@@ -174,9 +199,11 @@ minetest.register_on_mods_loaded(function()
     for name, def in pairs(minetest.registered_items) do
         local item_crafts = minetest.get_all_craft_recipes(name) or {}
         for _, craft in ipairs(item_crafts) do
-            if craft.method == "normal" or craft.method == "cooking" then
-                better_randomizer.all_crafts[craft.method][#better_randomizer.all_crafts[craft.method]+1] = craft.output
-                better_randomizer.random_crafts[craft.method][craft.output] = craft.output
+            if craft.output ~= "" and (craft.method == "normal" or craft.method == "cooking") then
+                if not better_randomizer.random_crafts[craft.method][craft.output] then
+                    table.insert(better_randomizer.all_crafts[craft.method], craft.output)
+                    better_randomizer.random_crafts[craft.method][craft.output] = craft.output
+                end
             end
         end
     end
@@ -203,9 +230,11 @@ local old_craft_result = minetest.get_craft_result
 -- This makes furnaces work.
 minetest.get_craft_result = function(input)
     local output, decremented_input = old_craft_result(input)
-    if input.method == "normal" or input.method == "cooking" then
-        local itemstring = better_randomizer.random_crafts[input.method][output.item:to_string()]
-        if itemstring then output.item = ItemStack(itemstring) end
+    if storage:get_int("crafts_randomized") == 1 then
+        if input.method == "normal" or input.method == "cooking" then
+            local itemstring = better_randomizer.random_crafts[input.method][output.item:to_string()]
+            if itemstring and (itemstring ~= "") then output.item = ItemStack(itemstring) end
+        end
     end
     return output, decremented_input
 end
