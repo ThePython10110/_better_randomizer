@@ -28,7 +28,7 @@ better_randomizer_randomize_entity_drops (Randomize Entity Drops) bool true
 
 [Forum](https://forum.minetest.net/viewtopic.php?f=9&t=29662)
 
-[ContentDB](https/content.minetest.net/ThePython10110/packages/_better_randomizer)
+[ContentDB](https/content.minetest.net/ThePython/packages/_better_randomizer)
 
 ### Chat commands:
 *All commands require the `server` privilege.*
