@@ -53,15 +53,15 @@ function better_randomizer.randomize_node_drops()
     local items = {}
     better_randomizer.random_node_drops = {}
     for name, def in pairs(minetest.registered_nodes) do
-        if (not def.groups.not_in_creative_inventory) and
-        ((def.drop ~= "" and def.drop ~= {}) or def._mcl_silk_touch_drop or def._mcl_shears_drop)
-        and not (mineclone and (minetest.get_item_group(name, "coral") == 1)) then
+        if (not def.groups.not_in_creative_inventory) and --if available in creative inventory
+        ((def.drop ~= "" and def.drop ~= {}) or (mineclone and def._mcl_silk_touch_drop or def._mcl_shears_drop)) --and has a drop
+        and not (mineclone and (minetest.get_item_group(name, "coral") == 1)) --and isn't live coral
+        and minetest.get_item_group(name, "ghost_block") ~= 1 then -- and isn't a ghost block
             table.insert(items, name)
+            local drop = def.drop or name
             if not mineclone then
-                table.insert(better_randomizer.random_node_drops, {name=name, overrides = {drop = def.drop}})
+                table.insert(better_randomizer.random_node_drops, {name=name, overrides = {drop = drop}})
             else
-                local drop = def.drop
-                if not drop then drop = name end
                 local silk_touch = def._mcl_silk_touch_drop
                 if silk_touch == true then silk_touch = name end
                 local shears = def._mcl_shears_drop
