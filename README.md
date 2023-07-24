@@ -23,8 +23,11 @@ better_randomizer_randomize_entity_drops (Randomize Entity Drops) bool true
 
 ### Links:
 [GitHub](https://github.com/ThePython10110/_better_randomizer)
+
 [Bug reports/feature requests](https://github.com/ThePython10110/_better_randomizer/issues)
+
 [Forum](https://forum.minetest.net/viewtopic.php?f=9&t=29662)
+
 [ContentDB](https/content.minetest.net/ThePython10110/packages/_better_randomizer)
 
 ### Chat commands:
